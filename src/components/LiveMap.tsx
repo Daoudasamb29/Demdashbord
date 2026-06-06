@@ -338,51 +338,6 @@ export default function LiveMap({
 
   return (
     <div id="live-map-container" className="flex flex-col h-full bg-slate-950 text-slate-100 font-sans relative overflow-hidden select-none">
-      {/* Top Map Action Bar */}
-      <div className="absolute top-4 left-4 right-4 z-[1000] flex flex-wrap gap-2 items-center justify-between pointer-events-none">
-        <div className="bg-slate-900/95 border border-slate-800 rounded-xl px-4 py-2.5 shadow-xl flex items-center gap-3 backdrop-blur-sm pointer-events-auto">
-          <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></div>
-          <div>
-            <div className="text-xs font-bold text-white flex items-center gap-1.5">
-              Supervision Dakar OSM Map
-              <span className="text-[10px] uppercase font-mono text-slate-400 bg-slate-800 px-1.5 py-0.5 rounded">GPS OK</span>
-            </div>
-            <div className="text-[10px] text-slate-400 font-medium">
-              Vitesse simulation: <span className="text-blue-400 font-semibold">{simulationSpeed}x</span> · {activeDrivers.length} balises actives
-            </div>
-          </div>
-        </div>
-
-        {/* Map view controllers */}
-        <div className="flex gap-2 pointer-events-auto">
-          <div className="bg-slate-900/95 border border-slate-800 rounded-xl p-1 shadow-xl flex items-center gap-1 backdrop-blur-sm">
-            <button
-              onClick={() => onToggleSimulation()}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
-                isSimulating
-                  ? 'bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 animate-pulse'
-                  : 'bg-slate-800 text-slate-300 hover:text-white border border-transparent'
-              }`}
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isSimulating ? 'animate-spin' : ''}`} />
-              <span>{isSimulating ? 'Simulation Live' : 'Simuler'}</span>
-            </button>
-
-            <select
-              value={simulationSpeed}
-              onChange={(e) => setSimulationSpeed(Number(e.target.value))}
-              disabled={!isSimulating}
-              className="bg-slate-800 border-none text-xs text-white px-2 py-1.5 rounded-lg font-medium focus:ring-0 cursor-pointer disabled:opacity-40"
-            >
-              <option value="1">1x (Lent)</option>
-              <option value="2">2x (Normal)</option>
-              <option value="5">5x (Rapide)</option>
-              <option value="10">10x (Super)</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
       {/* Main Interactive Leaflet Map Area */}
       <div 
         ref={mapContainerRef} 
