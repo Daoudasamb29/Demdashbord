@@ -10,6 +10,7 @@ interface CourseListProps {
   onAssignDriverClick: (course: Course) => void;
   onCompleteCourse: (courseId: string) => void;
   onCancelCourse: (courseId: string) => void;
+  onRejectCourse?: (courseId: string) => void;
 }
 
 export default function CourseList({
@@ -20,6 +21,7 @@ export default function CourseList({
   onAssignDriverClick,
   onCompleteCourse,
   onCancelCourse,
+  onRejectCourse,
 }: CourseListProps) {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -307,6 +309,21 @@ export default function CourseList({
                         >
                           <XCircle className="w-3.5 h-3.5" />
                           <span>Annuler</span>
+                        </button>
+                      )}
+
+                      {['assigned', 'en_route_pickup'].includes(course.status) && onRejectCourse && (
+                        <button
+                          id={`btn-reject-${course.id}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onRejectCourse(course.id);
+                          }}
+                          className="col-span-2 w-full py-2 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-700 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                          title="Simuler un rejet de l'assignation par le chauffeur"
+                        >
+                          <XCircle className="w-3.5 h-3.5 text-amber-600" />
+                          <span>Simuler Refus Chauffeur</span>
                         </button>
                       )}
                     </div>

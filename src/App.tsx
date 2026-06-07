@@ -88,8 +88,35 @@ export default function App() {
             triggerBeep(580, 0.4);
           } else if (payload.eventType === 'UPDATE') {
             const updatedCourse = mapRideToCourse(payload.new);
-            setCourses((prev) => prev.map((c) => c.id === updatedCourse.id ? updatedCourse : c));
-            writeLog(`La course #${updatedCourse.id} a été mise à jour en direct ! (Statut: ${updatedCourse.status.toUpperCase()})`, 'info', updatedCourse.id);
+            
+            setCourses((prev) => {
+              const currentCourse = prev.find((c) => c.id === updatedCourse.id);
+              
+              // Si la base de données passe le trajet à 'cancelled' (maps to local 'canceled'),
+              // alors que l'application du répartiteur l'avait en statut 'assigned' ou 'en_route_pickup' :
+              // C'est un refus/rejet ou une annulation de la part du chauffeur !
+              if (
+                updatedCourse.status === 'canceled' &&
+                currentCourse &&
+                ['assigned', 'en_route_pickup'].includes(currentCourse.status)
+              ) {
+                console.log(`[Supabase Real-Time] Refus/rejet du chauffeur détecté pour #${updatedCourse.id}. Remise en attente automatique...`);
+                
+                // Exécute handleRejectCourse de façon asynchrone pour libérer le chauffeur dans Supabase,
+                // mettre à jour les logs système et appliquer la sauvegarde finale de 'pending'.
+                setTimeout(() => {
+                  handleRejectCourse(updatedCourse.id);
+                }, 50);
+
+                // Retour immédiat d'une prédiction 'pending' pour mettre à jour l'affichage instantanément
+                const revertedCourse: Course = { ...currentCourse, status: 'pending', driverId: null, progress: 0 };
+                return prev.map((c) => c.id === updatedCourse.id ? revertedCourse : c);
+              }
+
+              // Mise à jour de flux classique
+              writeLog(`La course #${updatedCourse.id} a été mise à jour en direct ! (Statut: ${updatedCourse.status.toUpperCase()})`, 'info', updatedCourse.id);
+              return prev.map((c) => c.id === updatedCourse.id ? updatedCourse : c);
+            });
           } else if (payload.eventType === 'DELETE') {
             setCourses((prev) => prev.filter((c) => c.id !== payload.old.id));
             writeLog(`La course #${payload.old.id} a été supprimée ou archivée.`, 'warning');
@@ -393,6 +420,54 @@ export default function App() {
     setSelectedCourse(null);
   };
 
+  const handleRejectCourse = (courseId: string) => {
+    setCourses((prevCourses) => {
+      const matchedCourse = prevCourses.find((c) => c.id === courseId);
+      if (!matchedCourse) return prevCourses;
+
+      const matchedDriverId = matchedCourse.driverId;
+      const updatedCourse: Course = { ...matchedCourse, status: 'pending', driverId: null, progress: 0 };
+      const nextCourses = prevCourses.map((c) => (c.id === courseId ? updatedCourse : c));
+
+      // Asynchronously update Supabase in the background
+      upsertCourse(updatedCourse, matchedCourse.status);
+
+      // Now update the driver status to available
+      if (matchedDriverId) {
+        setDrivers((prevDrivers) => {
+          const matchDriver = prevDrivers.find((d) => d.id === matchedDriverId);
+          if (matchDriver) {
+            const updatedDriver: Driver = { ...matchDriver, status: 'available' };
+            upsertDriver(updatedDriver);
+            
+            writeLog(
+              `Le chauffeur ${matchDriver.name} a rejeté la course #${courseId}. La course redevient disponible pour assignation.`,
+              'warning',
+              courseId,
+              matchedDriverId
+            );
+            
+            return prevDrivers.map((d) =>
+              d.id === matchedDriverId ? updatedDriver : d
+            );
+          }
+          return prevDrivers;
+        });
+      } else {
+        writeLog(
+          `Course #${courseId} rejetée. Retour au statut en attente d'assignation.`,
+          'warning',
+          courseId
+        );
+      }
+
+      triggerBeep(260, 0.45); // alert beep
+      setSelectedCourse(updatedCourse);
+      
+      return nextCourses;
+    });
+  };
+
   const handleToggleDriverStatus = (driverId: string) => {
     setDrivers((prev) =>
       prev.map((d) => {
@@ -585,6 +660,7 @@ export default function App() {
                         onAssignDriverClick={(c) => setCourseToAssign(c)}
                         onCompleteCourse={handleCompleteCourse}
                         onCancelCourse={handleCancelCourse}
+                        onRejectCourse={handleRejectCourse}
                       />
                     </div>
                   </div>
