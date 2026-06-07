@@ -61,7 +61,7 @@ export default function DriverList({
   };
 
   return (
-    <div id="driver-hub" className="flex flex-col h-full bg-slate-50 font-sans border-r border-slate-200">
+    <div id="driver-hub" className="flex flex-col h-full bg-white font-sans">
       {/* Search Header */}
       <div className="p-4 bg-white border-b border-slate-200 space-y-3">
         <h3 className="text-sm font-extrabold text-slate-900 tracking-wide uppercase flex items-center justify-between">
@@ -103,7 +103,7 @@ export default function DriverList({
       </div>
 
       {/* Driver list container */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/60">
         {filteredDrivers.length === 0 ? (
           <div className="text-center py-12 px-4 space-y-2">
             <p className="text-slate-400 font-medium text-xs">Aucun chauffeur ne correspond</p>

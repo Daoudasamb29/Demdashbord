@@ -554,91 +554,68 @@ export default function App() {
           onGenerateRandomCourse={handleGenerateRandomCourse}
         />
 
-        {/* Stats metrics list view row */}
-        <StatsBar courses={courses} drivers={drivers} />
-
         {/* Main display switches area */}
         <div id="tab-outlet-zone" className="flex-1 overflow-hidden relative">
           
           {/* Active TAB: Interactive Dashboard */}
           {currentTab === 'dashboard' && (
-            <div className="grid grid-cols-1 lg:grid-cols-12 h-full overflow-hidden">
-              {/* Map Column */}
-              <div className="lg:col-span-8 h-full min-w-0">
-                <LiveMap
-                  courses={courses}
-                  drivers={drivers}
-                  selectedCourse={selectedCourse}
-                  onSelectCourse={setSelectedCourse}
-                  selectedDriver={selectedDriver}
-                  onSelectDriver={setSelectedDriver}
-                  isSimulating={isSimulating}
-                  onToggleSimulation={() => {
-                    setIsSimulating(!isSimulating);
-                    writeLog(`Simulation VTC ${!isSimulating ? 'ACTIVÉE' : 'DÉSACTIVÉE'}.`, !isSimulating ? 'success' : 'info');
-                  }}
-                  simulationSpeed={simulationSpeed}
-                  setSimulationSpeed={setSimulationSpeed}
-                />
-              </div>
+            <div className="h-full overflow-y-auto bg-slate-100 flex flex-col">
+              <div className="max-w-7xl mx-auto w-full p-6 space-y-6 flex-1">
+                {/* Stats metrics list view row */}
+                <StatsBar courses={courses} drivers={drivers} />
 
-              {/* Right Side Info tab blocks (Courses / Drivers toggled tabs) */}
-              <div className="lg:col-span-4 h-full bg-white border-l border-slate-200 flex flex-col overflow-hidden">
-                <div role="tablist" className="flex border-b border-slate-200 shrink-0">
-                  <button
-                    id="tab-btn-courses"
-                    role="tab"
-                    aria-selected={dashboardRightTab === 'courses'}
-                    onClick={() => setDashboardRightTab('courses')}
-                    className={`flex-1 py-3 text-xs font-extrabold uppercase tracking-widest text-center transition-all ${
-                      dashboardRightTab === 'courses'
-                        ? 'border-b-2 border-blue-600 text-blue-600 font-black'
-                        : 'text-slate-400 hover:text-slate-600'
-                    }`}
-                  >
-                    Courses ({courses.filter(c => c.status !== 'completed' && c.status !== 'canceled').length})
-                  </button>
-                  <button
-                    id="tab-btn-drivers"
-                    role="tab"
-                    aria-selected={dashboardRightTab === 'drivers'}
-                    onClick={() => setDashboardRightTab('drivers')}
-                    className={`flex-1 py-3 text-xs font-extrabold uppercase tracking-widest text-center transition-all ${
-                      dashboardRightTab === 'drivers'
-                        ? 'border-b-2 border-blue-600 text-blue-600 font-black'
-                        : 'text-slate-400 hover:text-slate-600'
-                    }`}
-                  >
-                    Chauffeurs VTC ({drivers.filter(d => d.status !== 'offline').length})
-                  </button>
-                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                  {/* Left Side: Courses Panel (lg:col-span-7) */}
+                  <div className="lg:col-span-7 h-[680px] bg-white border border-slate-200 rounded-2xl flex flex-col overflow-hidden shadow-xs">
+                    <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                      <div>
+                        <h3 className="text-xs font-black uppercase tracking-wider text-slate-800">Suivi des Courses Actives</h3>
+                        <p className="text-[10px] text-slate-400 font-medium">Affectations et progression en temps réel</p>
+                      </div>
+                      <span className="bg-blue-100 text-blue-700 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full font-mono">
+                        {courses.filter(c => c.status !== 'completed' && c.status !== 'canceled').length}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-h-0 overflow-hidden">
+                      <CourseList
+                        courses={courses}
+                        drivers={drivers}
+                        selectedCourse={selectedCourse}
+                        onSelectCourse={setSelectedCourse}
+                        onAssignDriverClick={(c) => setCourseToAssign(c)}
+                        onCompleteCourse={handleCompleteCourse}
+                        onCancelCourse={handleCancelCourse}
+                      />
+                    </div>
+                  </div>
 
-                <div className="flex-1 overflow-hidden">
-                  {dashboardRightTab === 'courses' ? (
-                    <CourseList
-                      courses={courses}
-                      drivers={drivers}
-                      selectedCourse={selectedCourse}
-                      onSelectCourse={setSelectedCourse}
-                      onAssignDriverClick={(c) => setCourseToAssign(c)}
-                      onCompleteCourse={handleCompleteCourse}
-                      onCancelCourse={handleCancelCourse}
-                    />
-                  ) : (
-                    <DriverList
-                      drivers={drivers}
-                      selectedDriver={selectedDriver}
-                      onSelectDriver={(driver) => {
-                        setSelectedDriver(driver);
-                        if (driver) {
-                          // Find active course if any to focus too
-                          const actCourse = courses.find((c) => c.driverId === driver.id && ['on_trip', 'assigned', 'en_route_pickup'].includes(c.status));
-                          if (actCourse) setSelectedCourse(actCourse);
-                        }
-                      }}
-                      onToggleDriverStatus={handleToggleDriverStatus}
-                    />
-                  )}
+                  {/* Right Side: Drivers Panel (lg:col-span-5) */}
+                  <div className="lg:col-span-5 h-[680px] bg-white border border-slate-200 rounded-2xl flex flex-col overflow-hidden shadow-xs">
+                    <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                      <div>
+                        <h3 className="text-xs font-black uppercase tracking-wider text-slate-800">Chauffeurs Connectés</h3>
+                        <p className="text-[10px] text-slate-400 font-medium">Disponibilités et statuts de service</p>
+                      </div>
+                      <span className="bg-emerald-100 text-emerald-700 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full font-mono">
+                        {drivers.filter(d => d.status !== 'offline').length}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-h-0 overflow-hidden">
+                      <DriverList
+                        drivers={drivers}
+                        selectedDriver={selectedDriver}
+                        onSelectDriver={(driver) => {
+                          setSelectedDriver(driver);
+                          if (driver) {
+                            // Find active course if any to focus too
+                            const actCourse = courses.find((c) => c.driverId === driver.id && ['on_trip', 'assigned', 'en_route_pickup'].includes(c.status));
+                            if (actCourse) setSelectedCourse(actCourse);
+                          }
+                        }}
+                        onToggleDriverStatus={handleToggleDriverStatus}
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
