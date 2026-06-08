@@ -152,7 +152,7 @@ export const mapProfileToDriver = mapRowToDriver;
  * Fetch all rides
  */
 export async function fetchCourses(): Promise<Course[]> {
-  if (!supabase) return initialCourses;
+  if (!supabase) return [];
 
   try {
     const { data, error } = await supabase
@@ -162,19 +162,17 @@ export async function fetchCourses(): Promise<Course[]> {
 
     if (error) {
       console.error('Erreur fetch rides:', error);
-      return initialCourses;
+      return [];
     }
 
-    if (!data || data.length === 0) {
-      console.log('Seeding initial rides into Supabase...');
-      await seedInitialCourses();
-      return initialCourses;
+    if (!data) {
+      return [];
     }
 
     return data.map(mapRideToCourse);
   } catch (e) {
     console.error(e);
-    return initialCourses;
+    return [];
   }
 }
 
@@ -182,7 +180,7 @@ export async function fetchCourses(): Promise<Course[]> {
  * Fetch all drivers with their profile information joined
  */
 export async function fetchDrivers(): Promise<Driver[]> {
-  if (!supabase) return initialDrivers;
+  if (!supabase) return [];
 
   try {
     const { data, error } = await supabase
@@ -191,19 +189,17 @@ export async function fetchDrivers(): Promise<Driver[]> {
 
     if (error) {
       console.error('Erreur fetch drivers:', error);
-      return initialDrivers;
+      return [];
     }
 
-    if (!data || data.length === 0) {
-      console.log('Seeding profiles and drivers into Supabase...');
-      await seedInitialDrivers();
-      return initialDrivers;
+    if (!data) {
+      return [];
     }
 
     return data.map(mapRowToDriver);
   } catch (e) {
     console.error(e);
-    return initialDrivers;
+    return [];
   }
 }
 

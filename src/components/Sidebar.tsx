@@ -6,9 +6,11 @@ interface SidebarProps {
   setCurrentTab: (tab: string) => void;
   pendingCount: number;
   activeCount: number;
+  currentUser: { email: string; name: string; source: 'supabase' | 'local'; id?: string } | null;
+  onLogout: () => void;
 }
 
-export default function Sidebar({ currentTab, setCurrentTab, pendingCount, activeCount }: SidebarProps) {
+export default function Sidebar({ currentTab, setCurrentTab, pendingCount, activeCount, currentUser, onLogout }: SidebarProps) {
   const menuItems = [
     { id: 'dashboard', name: 'Tableau de bord', icon: LayoutDashboard, badge: pendingCount > 0 ? pendingCount : undefined, badgeColor: 'bg-amber-600' },
     { id: 'courses', name: 'Courses VTC', icon: Car, badge: activeCount > 0 ? activeCount : undefined, badgeColor: 'bg-emerald-600' },
@@ -93,27 +95,32 @@ export default function Sidebar({ currentTab, setCurrentTab, pendingCount, activ
         <div className="flex items-center gap-3">
           <div className="relative">
             <div className="w-9 h-9 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-xs text-blue-400 uppercase">
-              DS
+              {currentUser?.name
+                ? currentUser.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()
+                : 'DS'}
             </div>
             <div className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-slate-900"></div>
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-xs font-semibold text-slate-200 truncate">Saliou Diop</div>
+            <div className="text-xs font-semibold text-slate-200 truncate" title={currentUser?.name || "Saliou Diop"}>
+              {currentUser?.name || 'Saliou Diop'}
+            </div>
             <div className="text-[10px] text-emerald-400 font-semibold truncate flex items-center gap-1">
-              <span>Dispatcher Actif</span>
+              <span>Dispatcher ({currentUser?.source === 'supabase' ? 'Cloud' : 'Sandbox'})</span>
             </div>
           </div>
           <button 
             id="btn-logout"
-            className="p-1.5 rounded-md text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+            onClick={onLogout}
+            className="p-1.5 rounded-md text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
             title="Se déconnecter"
           >
             <LogOut className="w-4 h-4" />
           </button>
         </div>
         <div className="mt-3 bg-slate-900 border border-slate-800 rounded-lg p-2 flex items-center justify-between text-[10px] text-slate-400">
-          <span className="font-mono">IP: 192.168.10.45</span>
-          <span className="text-blue-400 font-semibold">TDR: 99.8%</span>
+          <span className="font-mono truncate max-w-[110px]" title={currentUser?.email}>{currentUser?.email || 'saliou@jengu.tech'}</span>
+          <span className="text-blue-400 font-semibold shrink-0">TDR: 99.8%</span>
         </div>
       </div>
     </div>

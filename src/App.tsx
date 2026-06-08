@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { initialDrivers, initialCourses, initialEventLogs, dakarNeighborhoods, getRouteData } from './initialData';
+import { dakarNeighborhoods, getRouteData } from './initialData';
 import { Course, Driver, EventLog } from './types';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
@@ -14,8 +14,37 @@ import AssignmentModal from './components/AssignmentModal';
 import { Sparkles, X, Check, ToggleLeft, Layers, Volume2, VolumeX, Database, Sliders, Globe } from 'lucide-react';
 import { isSupabaseConfigured, supabase } from './supabaseClient';
 import { fetchCourses, fetchDrivers, upsertCourse, upsertDriver, mapRideToCourse, mapProfileToDriver } from './supabaseService';
+import LoginView from './components/LoginView';
 
 export default function App() {
+  // Current logged in dispatcher auth state
+  const [currentUser, setCurrentUser] = useState<{ email: string; name: string; source: 'supabase' | 'local'; id?: string } | null>(() => {
+    const saved = localStorage.getItem('jengu_currentUser');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  });
+
+  const handleLoginSuccess = (user: { email: string; name: string; source: 'supabase' | 'local'; id?: string }) => {
+    setCurrentUser(user);
+    localStorage.setItem('jengu_currentUser', JSON.stringify(user));
+    writeLog(`Utilisateur ${user.name} connecté avec succès (${user.source === 'supabase' ? 'Supabase' : 'Local'}).`, 'success');
+  };
+
+  const handleLogout = async () => {
+    if (currentUser?.source === 'supabase' && supabase) {
+      await supabase.auth.signOut();
+    }
+    setCurrentUser(null);
+    localStorage.removeItem('jengu_currentUser');
+    writeLog('Utilisateur déconnecté.', 'info');
+  };
+
   // Navigation tabs
   const [currentTab, setCurrentTab] = useState<string>('dashboard');
   
@@ -23,9 +52,49 @@ export default function App() {
   const [dashboardRightTab, setDashboardRightTab] = useState<'courses' | 'drivers'>('courses');
 
   // Main State Containers
-  const [courses, setCourses] = useState<Course[]>(initialCourses);
-  const [drivers, setDrivers] = useState<Driver[]>(initialDrivers);
-  const [logs, setLogs] = useState<EventLog[]>(initialEventLogs);
+  const [courses, rawSetCourses] = useState<Course[]>([]);
+  const [drivers, rawSetDrivers] = useState<Driver[]>([]);
+
+  // Safe wrapper setters that guarantee unique IDs in arrays (React keys safeguard)
+  const setCourses = (val: Course[] | ((prev: Course[]) => Course[])) => {
+    rawSetCourses((prev) => {
+      const resolved = typeof val === 'function' ? val(prev) : val;
+      const seen = new Set<string>();
+      return resolved.filter((c) => {
+        if (!c || !c.id) return false;
+        if (seen.has(c.id)) {
+          console.warn(`[DriveOps Unique Guard] Supprimé doublon de course ID: ${c.id}`);
+          return false;
+        }
+        seen.add(c.id);
+        return true;
+      });
+    });
+  };
+
+  const setDrivers = (val: Driver[] | ((prev: Driver[]) => Driver[])) => {
+    rawSetDrivers((prev) => {
+      const resolved = typeof val === 'function' ? val(prev) : val;
+      const seen = new Set<string>();
+      return resolved.filter((d) => {
+        if (!d || !d.id) return false;
+        if (seen.has(d.id)) {
+          console.warn(`[DriveOps Unique Guard] Supprimé doublon de chauffeur ID: ${d.id}`);
+          return false;
+        }
+        seen.add(d.id);
+        return true;
+      });
+    });
+  };
+  const [logs, setLogs] = useState<EventLog[]>([
+    {
+      id: 'init-001',
+      timestamp: new Date().toLocaleTimeString('fr-FR'),
+      message: 'Système DriveOps v1.2 initialisé - Supervision Transit Inter-Urbain.',
+      type: 'info'
+    }
+  ]);
 
   // Selected entities highlights on Map/Panels
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
@@ -210,7 +279,8 @@ export default function App() {
   };
 
   const handleCreateCourse = (courseData: Omit<Course, 'id' | 'createdAt' | 'status' | 'driverId' | 'progress'>) => {
-    const newId = `CR-${Math.floor(8000 + Math.random() * 2000)}`;
+    // Generate a highly unique 6-digit number based ID to guarantee zero collision
+    const newId = `CR-${Math.floor(100000 + Math.random() * 900000)}`;
     const newCourse: Course = {
       ...courseData,
       id: newId,
@@ -609,6 +679,10 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
+  if (!currentUser) {
+    return <LoginView onLoginSuccess={handleLoginSuccess} />;
+  }
+
   return (
     <div id="jengu-app" className="flex h-screen bg-slate-100 text-slate-800 font-sans overflow-hidden select-none">
       {/* Sidebar navigation */}
@@ -619,6 +693,8 @@ export default function App() {
         }}
         pendingCount={courses.filter((c) => c.status === 'pending').length}
         activeCount={courses.filter((c) => ['on_trip', 'assigned', 'en_route_pickup'].includes(c.status)).length}
+        currentUser={currentUser}
+        onLogout={handleLogout}
       />
 
       {/* Main Panel space container */}
@@ -927,23 +1003,35 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Reset default dataset */}
+                  {/* Sync datasets with Supabase */}
                   <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex justify-between items-center">
                     <div>
-                      <h4 className="font-bold text-slate-800">Réinitialiser les données</h4>
-                      <p className="text-[10px] text-slate-400 font-normal mt-0.5">Restaurer la liste initiale des trajets de Dakar et des chauffeurs</p>
+                      <h4 className="font-bold text-slate-800">Actualiser les données</h4>
+                      <p className="text-[10px] text-slate-400 font-normal mt-0.5">Recharger et synchroniser la liste à jour à partir de Supabase</p>
                     </div>
                     <button
-                      onClick={() => {
-                        setCourses(initialCourses);
-                        setDrivers(initialDrivers);
-                        setLogs(initialEventLogs);
-                        writeLog('Base de données restaurée à l\'état usine.', 'info');
+                      onClick={async () => {
+                        if (isSupabaseConfigured()) {
+                          writeLog('Rechargement des données depuis Supabase...', 'info');
+                          try {
+                            const [dbCourses, dbDrivers] = await Promise.all([
+                              fetchCourses(),
+                              fetchDrivers()
+                            ]);
+                            setCourses(dbCourses);
+                            setDrivers(dbDrivers);
+                            writeLog('Données synchronisées avec succès !', 'success');
+                          } catch (err) {
+                            writeLog('Erreur lors du rechargement des données.', 'error');
+                          }
+                        } else {
+                          writeLog('Supabase non configuré pour la synchronisation.', 'error');
+                        }
                         triggerBeep(400, 0.3);
                       }}
-                      className="px-3.5 py-1.5 bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-700 rounded-lg font-bold text-[10px] uppercase transition-all"
+                      className="px-3.5 py-1.5 bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-700 rounded-lg font-bold text-[10px] uppercase transition-all"
                     >
-                      Réinitialiser
+                      Actualiser
                     </button>
                   </div>
                 </div>

@@ -17,10 +17,18 @@ export default function CourseForm({ onCreateCourse, onClose }: CourseFormProps)
   const [dropoffName, setDropoffName] = useState(dakarNeighborhoods[1].name);
   const [scheduledTime, setScheduledTime] = useState('Immédiat');
   const [customTime, setCustomTime] = useState('15:00');
+  const [customDate, setCustomDate] = useState(() => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  });
   const [passengersCount, setPassengersCount] = useState(1);
   const [babySeat, setBabySeat] = useState(false);
   const [vipVehicle, setVipVehicle] = useState(false);
   const [luggage, setLuggage] = useState(false);
+  const [smartBypass, setSmartBypass] = useState(true);
 
   // Calculated variables
   const [distance, setDistance] = useState(0);
@@ -41,18 +49,24 @@ export default function CourseForm({ onCreateCourse, onClose }: CourseFormProps)
       }
       const route = getRouteData(pickupName, dropoffName);
       const calculatedDist = route.dist;
-      const calculatedDuration = Math.round(calculatedDist * 1.0 + 10); // Intercity Driving is ~1 min per km + buffer
+      
+      // If smartBypass is enabled, we assume the vehicles take optimized freeway routes
+      // (Autoroute à péage / Contournement rapide) decreasing overall urban sitting time.
+      const trafficDelayFactor = smartBypass ? 0.70 : 1.15; // Save 30% duration under smart bypass, otherwise add 15% traffic delay
+      const calculatedDuration = Math.round((calculatedDist * 1.0 + 8) * trafficDelayFactor); 
       
       let finalPrice = route.basePrice;
       if (vipVehicle) finalPrice += 5000;
       if (babySeat) finalPrice += 1500;
       if (luggage) finalPrice += 1000;
+      // Add +1500 FCFA toll processing fee (E-Toll / Rapido) for highway speed pass
+      if (smartBypass) finalPrice += 2000;
 
       setDistance(calculatedDist);
       setDuration(calculatedDuration);
       setPrice(finalPrice);
     }
-  }, [pickupName, dropoffName, vipVehicle, babySeat, luggage]);
+  }, [pickupName, dropoffName, vipVehicle, babySeat, luggage, smartBypass]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,7 +86,7 @@ export default function CourseForm({ onCreateCourse, onClose }: CourseFormProps)
       price,
       distance,
       duration,
-      scheduledTime: scheduledTime === 'Immédiat' ? 'Immédiat' : customTime,
+      scheduledTime: scheduledTime === 'Immédiat' ? 'Immédiat' : `Le ${customDate.split('-').reverse().join('/')} à ${customTime}`,
       passengersCount,
       options: {
         babySeat,
@@ -91,7 +105,7 @@ export default function CourseForm({ onCreateCourse, onClose }: CourseFormProps)
   };
 
   return (
-    <div id="new-course-modal" className="bg-white border text-left border-slate-200 shadow-2xl rounded-2xl w-full p-6 relative font-sans space-y-5 animate-fade-in">
+    <div id="new-course-modal" className="bg-white border text-left border-slate-200 shadow-2xl rounded-2xl w-full max-h-[85vh] overflow-y-auto custom-scrollbar p-6 relative font-sans space-y-5 animate-fade-in">
       <div className="flex justify-between items-start border-b border-slate-100 pb-3">
         <div>
           <h3 className="text-sm font-extrabold text-slate-900 uppercase tracking-widest flex items-center gap-1.5">
@@ -274,16 +288,29 @@ export default function CourseForm({ onCreateCourse, onClose }: CourseFormProps)
           </div>
         </div>
 
-        {/* Custom time picker if scheduled */}
+        {/* Custom time and date picker if scheduled */}
         {scheduledTime === 'Planifié' && (
-          <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg animate-fade-in">
-            <label className="text-[10px] text-slate-400 uppercase tracking-widest block mb-1">Entrer l'heure planifiée (Aujourd'hui)</label>
-            <input
-              type="time"
-              value={customTime}
-              onChange={(e) => setCustomTime(e.target.value)}
-              className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-md text-xs"
-            />
+          <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg animate-fade-in grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <label className="text-[9px] text-slate-400 uppercase tracking-widest block font-extrabold text-indigo-600">Date de départ</label>
+              <input
+                type="date"
+                required
+                value={customDate}
+                onChange={(e) => setCustomDate(e.target.value)}
+                className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-md text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[9px] text-slate-400 uppercase tracking-widest block font-extrabold text-indigo-600">Heure de départ</label>
+              <input
+                type="time"
+                required
+                value={customTime}
+                onChange={(e) => setCustomTime(e.target.value)}
+                className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-md text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
           </div>
         )}
 
@@ -327,6 +354,42 @@ export default function CourseForm({ onCreateCourse, onClose }: CourseFormProps)
               <span className="text-[10px]">Bagages (+1 000 F)</span>
             </button>
           </div>
+        </div>
+
+        {/* Dakar Smart Traffic Bypass Optimizer Option */}
+        <div className="p-3 bg-gradient-to-r from-teal-50/70 to-emerald-50/70 border border-emerald-200/60 rounded-xl space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="flex h-2 w-2 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <div>
+                <span className="font-bold text-[10px] text-emerald-800 uppercase tracking-widest block">Évitement de trafic intelligent (Premium)</span>
+                <span className="text-[9px] text-emerald-600 font-medium">Contournement automatique des bouchons via Autoroute & VDN</span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSmartBypass(!smartBypass)}
+              id="btn-toggle-smart-bypass"
+              className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 focus:outline-none flex items-center ${
+                smartBypass ? 'bg-emerald-600 justify-end' : 'bg-slate-300 justify-start'
+              }`}
+            >
+              <span className="w-4 h-4 rounded-full bg-white shadow-sm" />
+            </button>
+          </div>
+
+          {smartBypass ? (
+            <div className="text-[9.5px] text-emerald-700 leading-relaxed font-normal bg-white/70 p-2 rounded border border-emerald-100/55">
+              🚀 <span className="font-bold">Gain ciblé :</span> ~30% de temps économisé en évitant les filtres de Pikine et de l'avenue Cheikh Anta Diop. Intègre automatiquement les frais d'autoroute à péage (+2 000 F Rapido inclus).
+            </div>
+          ) : (
+            <div className="text-[9.5px] text-slate-500 leading-relaxed font-normal bg-slate-100/50 p-2 rounded border border-slate-200/60">
+              ⚠️ Mode itinéraire classique sélectionné. Trajet susceptible de subir d'importantes congestions aux heures de pointe d'entrée/sortie de Dakar.
+            </div>
+          )}
         </div>
 
         {/* Dynamic Pricing Estimate Frame */}
